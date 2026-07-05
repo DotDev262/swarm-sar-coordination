@@ -1,2 +1,4 @@
-[tools]
-"aqua:godotengine/godot"= {version="4.7-stable"}
+
+[tasks]
+
+dev = {run = "godot -e --path ./project"}
