@@ -195,4 +195,10 @@ def _is_blocked_snap(snap, pos):
     h, w = len(snap.grid), len(snap.grid[0])
     if not (0 <= x < w and 0 <= y < h):
         return True
-    return snap.grid[y][x] == 1 or pos in snap.drone_positions.values()
+    if snap.grid[y][x] == 1:
+        return True
+    if pos == snap.home:
+        return False
+    if pos in snap.drone_positions.values():
+        return True
+    return False

@@ -167,8 +167,6 @@ class MissionManager:
     def update(self, drones: list, tick: int) -> None:
         pass
 
-    def flush_log(self) -> None:
-        pass
-
     def summary_line(self, tick: int) -> str:
-        return ""
+        return (f"{tick},,{len(self.failure_log)},{self.coverage()*100:.2f},"
+                f"{len(self.searchable - self.searched)},,0")

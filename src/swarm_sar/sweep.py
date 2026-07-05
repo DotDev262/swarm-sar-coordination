@@ -1,136 +1,94 @@
-from typing import List, Optional
-from src.swarm_sar.environment import Environment, SimConfig
-from src.swarm_sar.simulator import Simulator
-from src.swarm_sar.mission_manager import MissionManager
+import json
+import os
+from dataclasses import dataclass
+from typing import Optional
+
+from swarm_sar.environment import SimConfig
+from swarm_sar.simulator import Simulator
 
 
-def run_sweep(config: SimConfig) -> List[dict]:
-    """
-    Run a sweep simulation with the given configuration.
+@dataclass
+class SweepConfig:
+    drones: list
+    grids: list
+    seeds: int
+    repeats: int
+    density: float
+    max_ticks: int
+    out_dir: str
+    verbose: bool
+    base_config: object
 
-    Args:
-        config: Simulation configuration
 
-    Returns:
-        List of results dictionaries containing simulation metrics
-    """
-    env = Environment.from_config(config)
-    sim = Simulator(env, config)
-    mm = sim.mm
-
-    results = []
-
-    while not sim.is_complete() and sim.tick < config.max_ticks:
+def _run_one(cfg: SimConfig) -> dict:
+    env_cfg = cfg
+    from swarm_sar.environment import Environment
+    env = Environment.from_config(env_cfg)
+    sim = Simulator(env, env_cfg)
+    while not sim.is_complete() and sim.tick < env_cfg.max_ticks:
         sim.tick_once()
-        mm.flush_log()
-
-    summary = {
-        "seed": config.seed,
-        "n_drones": config.n_drones,
-        "grid_size": config.grid_size,
-        "coverage": sim.mm.coverage(),
-        "coverage_pct": sim.mm.coverage() * 100,
-        final_tick=sim.tick,
+    active = sum(1 for d in sim.drones if d.alive)
+    avg_bat = (
+        sum(d.battery for d in sim.drones if d.alive) / active
+        if active > 0
+        else 0.0
+    )
+    return {
+        "seed": env_cfg.seed,
+        "n_drones": env_cfg.n_drones,
+        "grid_size": env_cfg.grid_size,
+        "obstacle_density": env_cfg.obstacle_density,
+        "final_tick": sim.tick,
+        "coverage_pct": round(sim.mm.coverage() * 100, 2),
         "searched_cells": len(sim.mm.searched),
-        "total_cells": len(sim.mm.searchable),
-        "active_drones": sum(1 for d in sim.drones if d.alive),
-        failed_drones=len(mm.failure_log),
-        "avg_battery": sum(d.battery for d in sim.drones if d.alive) / max(1, sum(1 for d in sim.drones if d.alive)),
+        "total_searchable": len(sim.mm.searchable),
+        "active_drones": active,
+        "failed_drones": len(sim.mm.failure_log),
+        "avg_battery": round(avg_bat, 2),
     }
-    results.append(summary)
-
-    return results
 
 
-def run_sweep_wrapper(
-    drones: List[int],
-    grids: List[int],
-    seeds: int = 3,
-    repeats: int = 3,
-    density: float = 0.10,
-    max_ticks: int = 5000,
-    out_dir: str = "out/sweep",
-    verbose: bool = False,
-    base_config: Optional[object] = None,
-):
-    """
-    Wrapper function for running sweeps with multiple configurations.
+def _cfg_from_sweep(sc: SweepConfig, n_drones: int, grid: int, seed: int) -> SimConfig:
+    base = sc.base_config
+    return SimConfig(
+        scenario_path=getattr(base, "scenario", None),
+        n_drones=n_drones,
+        grid_size=grid,
+        seed=seed,
+        obstacle_density=sc.density,
+        ticks_per_second=getattr(base, "tps", 10),
+        max_ticks=sc.max_ticks,
+        coverage_threshold=getattr(base, "coverage", 1.0),
+        log_interval_ticks=getattr(base, "log_every", 10),
+        sensor_radius=getattr(base, "sensor_radius", 2),
+        failure_rate=getattr(base, "failure_rate", 0.0),
+        kills=(),
+    )
 
-    Args:
-        drones: List of drone counts to test
-        grids: List of grid sizes to test
-        seeds: Number of random seeds to test
-        repeats: Number of repeats per configuration
-        density: Obstacle density
-        max_ticks: Maximum ticks per simulation
-        out_dir: Output directory
-        verbose: Enable verbose output
-        base_config: Base configuration object
-    """
-    import os
-    import json
 
-    if base_config is None:
-
-        class BaseConfig:
-            pass
-
-        base_config = BaseConfig()
-        base_config.ticks_per_second = 10
-        base_config.log_interval_ticks = 10
-        base_config.sensor_radius = 2
-        base_config.failure_rate = 0.0
-        base_config.recharge_rate = 1.0
-        base_config.battery_safety_margin = 1.0
-        base_config.reporting_duration_ticks = 2
-
-    os.makedirs(out_dir, exist_ok=True)
+def run_sweep(sc: SweepConfig) -> list:
+    os.makedirs(sc.out_dir, exist_ok=True)
     results = []
-
-    for drone_count in drones:
-        for grid_size in grids:
-            for seed in range(seeds):
-                for repeat in range(repeats):
-                    config = SimConfig(
-                        scenario_path=None,
-                        n_drones=drone_count,
-                        grid_size=grid_size,
-                        seed=seed + repeat * 1000,
-                        obstacle_density=density,
-                        ticks_per_second=base_config.ticks_per_second,
-                        max_ticks=max_ticks,
-                        coverage_threshold=base_config.coverage,
-                        log_interval_ticks=base_config.log_interval_ticks,
-                        sensor_radius=base_config.sensor_radius,
-                        failure_rate=base_config.failure_rate,
-                        kills=base_config.kills,
-                        recharge_rate=base_config.recharge_rate,
-                        battery_safety_margin=base_config.battery_safety_margin,
-                        reporting_duration_ticks=base_config.reporting_duration_ticks,
+    for n in sc.drones:
+        for g in sc.grids:
+            for seed in range(sc.seeds):
+                for rep in range(sc.repeats):
+                    run_seed = seed + rep * 1000
+                    cfg = _cfg_from_sweep(sc, n, g, run_seed)
+                    if sc.verbose:
+                        print(f"sweep drones={n} grid={g} seed={run_seed}")
+                    res = _run_one(cfg)
+                    res["repeat"] = rep
+                    fname = os.path.join(
+                        sc.out_dir,
+                        f"sweep_d{n}_g{g}_s{run_seed}_r{rep}.json",
                     )
-
-                    if verbose:
-                        print(f"Running: drones={drone_count}, grid={grid_size}, seed={seed}, repeat={repeat}")
-
-                    sweep_results = run_sweep(config)
-
-                    for result in sweep_results:
-                        result["drone_count"] = drone_count
-                        result["grid_size"] = grid_size
-                        result["repeat"] = repeat
-
-                        filename = f"{out_dir}/sweep_d{drone_count}_g{grid_size}_s{seed}_r{repeat}.json"
-
-                        with open(filename, "w") as f:
-                            json.dump(result, f, indent=2)
-
-                        results.append(result)
-
-                        if verbose:
-                            print(f"Saved: {filename}")
-
-    summary_path = f"{out_dir}/sweep_summary.json"
-    with open(summary_path, "w") as f:
-        json.dump(results, f, indent=2)
-
+                    with open(fname, "w") as fh:
+                        json.dump(res, fh, indent=2)
+                    results.append(res)
+    summary = os.path.join(sc.out_dir, "sweep_summary.json")
+    with open(summary, "w") as fh:
+        json.dump(results, fh, indent=2)
+    if sc.verbose:
+        print(f"sweep complete: {len(results)} runs -> {summary}")
     return results

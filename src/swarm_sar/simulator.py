@@ -67,6 +67,11 @@ class Simulator:
         for d, action in zip(alive, proposals):
             d.commit(action, snap)
             self.mm.record_move(d.id)
+            if d.state == DroneState.SEARCHING and d.target is not None and d.pos == d.target:
+                d.state = DroneState.RETURNING
+                d.target = None
+                d.path = []
+                self.mm.in_flight.pop(d.id, None)
 
         self.tick += 1
 

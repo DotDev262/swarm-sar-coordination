@@ -1,10 +1,10 @@
 import argparse
 import sys
 import time
-import pygame
 
 
 def run_interactive(config):
+    import pygame
     from swarm_sar.simulator import Simulator
     from swarm_sar.environment import Environment
     from swarm_sar.renderer import Renderer
