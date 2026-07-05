@@ -1,6 +1,5 @@
 import heapq
 from typing import Optional
-import numpy as np
 
 
 _NEIGHBORS = [(dx, dy)

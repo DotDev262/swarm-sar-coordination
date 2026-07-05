@@ -1,9 +1,7 @@
-import csv
-import time
 from dataclasses import dataclass
 from typing import Optional
 import numpy as np
-from src.swarm_sar.environment import Environment, SimConfig
+from swarm_sar.environment import Environment, SimConfig
 
 
 @dataclass(frozen=True)
@@ -22,7 +20,7 @@ class MissionManager:
         self.config = config
         self.home = env.home
         self.searchable: set[tuple[int, int]] = {
-            (x, y) for y, x in zip(*np.where(env.grid == 0))
+            (int(x), int(y)) for y, x in zip(*np.where(env.grid == 0))
         }
         self.searched: set[tuple[int, int]] = set()
         self.in_flight: dict[int, tuple[int, int]] = {}
@@ -42,9 +40,6 @@ class MissionManager:
         }
         self.failure_log: list[tuple[int, int, int]] = []
         self._log_path: Optional[str] = None
-        self._log_buf: list[str] = []
-        self._wrote_header = False
-        self._log_interval = config.log_interval_ticks
 
     def set_log_path(self, path: str) -> None:
         self._log_path = path
@@ -82,28 +77,19 @@ class MissionManager:
             if active > 0
             else 0.0
         )
-        line = (
-            f"{tick},{active},{failed},{cov:.2f},{remaining},"
-            f"{avg_bat:.2f},0\n"
-        )
+        fields = [str(tick), str(active), str(failed), f"{cov:.2f}",
+                  str(remaining), f"{avg_bat:.2f}", "0"]
         for d in drones:
             state = d.state.name if d.alive else "DEAD"
-            pos = f"({int(d.pos[0])},{int(d.pos[1])})"
+            pos = f"{int(d.pos[0])};{int(d.pos[1])}"
             target = (
-                f"({int(d.target[0])},{int(d.target[1])})"
+                f"{int(d.target[0])};{int(d.target[1])}"
                 if d.target is not None
                 else "-"
             )
-            bat = f"{d.battery:.2f}"
-            line += f"{state},{pos},{target},{bat},\n"
+            fields += [state, pos, target, f"{d.battery:.2f}"]
         with open(self._log_path, "a") as fh:
-            fh.write(line)
-
-    def flush_log(self) -> None:
-        if self._log_buf:
-            with open(self._log_path, "a", newline="") as fh:
-                fh.write("\n".join(self._log_buf))
-            self._log_buf = []
+            fh.write(",".join(fields) + "\n")
 
     def assign_task(
         self, drone_id: int, drone_pos: tuple[int, int]

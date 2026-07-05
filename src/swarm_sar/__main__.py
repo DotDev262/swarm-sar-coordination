@@ -1,5 +1,4 @@
 import argparse
-import sys
 import time
 
 
@@ -26,7 +25,7 @@ def run_interactive(config):
         if not paused:
             while accumulator >= 1.0 / tps:
                 sim.tick_once()
-                mm.flush_log()
+                mm.log_drone_states(sim.tick, sim.drones)
                 accumulator -= 1.0 / tps
                 if sim.is_complete():
                     running = False
@@ -48,7 +47,6 @@ def run_interactive(config):
         if running:
             renderer.draw()
         clock.tick(60)
-    mm.flush_log()
     if mm._log_path:
         with open(mm._log_path, "a") as fh:
             fh.write(mm.summary_line(sim.tick) + "\n")
@@ -74,21 +72,20 @@ def run_sweep(args):
 def run_headless(config):
     from swarm_sar.simulator import Simulator
     from swarm_sar.environment import Environment
-    
+
     env = Environment.from_config(config)
     sim = Simulator(env, config)
     mm = sim.mm
     mm.set_log_path(f"out/headless_d{config.n_drones}_s{config.seed}.csv")
-    
+
     while not sim.is_complete() and sim.tick < config.max_ticks:
         sim.tick_once()
         mm.log_drone_states(sim.tick, sim.drones)
-        mm.flush_log()
-    
+
     if mm._log_path:
         with open(mm._log_path, "a") as fh:
             fh.write(mm.summary_line(sim.tick) + "\n")
-    print(f"Headless simulation completed")
+    print("Headless simulation completed")
     print(f"  Ticks: {sim.tick}")
     print(f"  Coverage: {sim.mm.coverage()*100:.2f}%")
     print(f"  Searched cells: {len(sim.mm.searched)}")
@@ -109,7 +106,6 @@ def main(argv=None):
     parser.add_argument("--log-every", type=int, default=10)
     parser.add_argument("--sensor-radius", type=int, default=2)
     parser.add_argument("--failure-rate", type=float, default=0.0)
-    parser.add_argument("--kill", type=str, default="")
     parser.add_argument("--sweep", action="store_true")
     parser.add_argument("--plot", type=str, default=None)
     parser.add_argument("--verbose", action="store_true")
@@ -123,11 +119,6 @@ def main(argv=None):
     parser.add_argument("--headless", action="store_true")
     parser.add_argument("--no-ui", dest="headless", action="store_true")
     args = parser.parse_args(argv)
-    kills = []
-    if args.kill:
-        for part in args.kill.split(","):
-            t, _, id_str = part.partition(":")
-            kills.append((int(t), int(id_str)))
     config = SimConfig(
         scenario_path=args.scenario,
         n_drones=args.drones,
@@ -140,7 +131,6 @@ def main(argv=None):
         log_interval_ticks=args.log_every,
         sensor_radius=args.sensor_radius,
         failure_rate=args.failure_rate,
-        kills=tuple(kills),
     )
     if args.plot:
         from swarm_sar.plot import main as plot_main

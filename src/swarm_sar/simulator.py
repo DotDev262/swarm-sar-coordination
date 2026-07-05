@@ -1,8 +1,8 @@
 import random
-from src.swarm_sar.environment import Environment
-from src.swarm_sar.mission_manager import MissionManager, SimConfig, Snapshot
-from src.swarm_sar.drone import DroneAgent, DroneState, Action
-from src.swarm_sar.astar import astar
+from swarm_sar.environment import Environment
+from swarm_sar.mission_manager import MissionManager, SimConfig
+from swarm_sar.drone import DroneAgent, DroneState
+from swarm_sar.astar import astar
 
 
 class Simulator:

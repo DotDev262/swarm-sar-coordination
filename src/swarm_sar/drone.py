@@ -2,9 +2,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 import numpy as np
-import math
-from src.swarm_sar.environment import SimConfig, Snapshot
-from src.swarm_sar.astar import astar
+from swarm_sar.environment import SimConfig
+from swarm_sar.mission_manager import Snapshot
+from swarm_sar.astar import astar
 
 
 @dataclass(frozen=True)
@@ -39,6 +39,10 @@ class DroneAgent:
     _reported: bool = field(default=False, repr=False)
 
     def propose(self, snap: Snapshot, rng):
+        # ponytail: propose mutates self.path (via _next_*_move re-path) and
+        # decrements reporting_ticks_remaining. Safe because Simulator calls
+        # propose exactly once per drone per tick. Pure-propose refactor
+        # deferred: would require threading the new path through Action.
         if not self.alive:
             return Action(None, frozenset(), False, None)
         if self.state == DroneState.IDLE:

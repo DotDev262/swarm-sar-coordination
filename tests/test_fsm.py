@@ -1,6 +1,6 @@
-import numpy as np
-from src.swarm_sar.drone import DroneAgent, DroneState
-from src.swarm_sar.environment import SimConfig, Snapshot
+from swarm_sar.drone import DroneAgent, DroneState
+from swarm_sar.environment import SimConfig
+from swarm_sar.mission_manager import Snapshot
 
 
 def _drone(pos=(0, 0), state=DroneState.IDLE, battery=100.0):
@@ -40,13 +40,13 @@ def test_searching_proposes_move():
 
 def test_searching_drains_battery():
     d = _drone(state=DroneState.SEARCHING, battery=50.0)
-    d.target = (1, 0)
-    d.path = [(1, 0)]
+    d.target = (4, 0)
+    d.path = [(1, 0), (2, 0), (3, 0), (4, 0)]
     snap = _snap()
     rng = __import__("random").Random(0)
     for _ in range(10):
-        d.propose(snap, rng)
-        d.commit(d.propose(snap, rng), snap)
+        action = d.propose(snap, rng)
+        d.commit(action, snap)
     assert d.battery <= 40.0
 
 
@@ -68,8 +68,8 @@ def test_at_home_returning_transitions_to_reporting():
     d.path = [(2, 2)]
     snap = _snap()
     rng = __import__("random").Random(0)
-    d.propose(snap, rng)
-    d.commit(d.propose(snap, rng), snap)
+    action = d.propose(snap, rng)
+    d.commit(action, snap)
     assert d.state == DroneState.REPORTING
 
 

@@ -25,19 +25,6 @@ class SimConfig:
     reporting_duration_ticks: int = 3
 
 
-from dataclasses import dataclass as _dataclass
-
-
-@_dataclass(frozen=True)
-class Snapshot:
-    grid: Tuple[Tuple[int, ...], ...]
-    obstacles: frozenset[Tuple[int, int]]
-    searched: frozenset[Tuple[int, int]]
-    drone_positions: dict[int, Tuple[int, int]]
-    home: Tuple[int, int]
-    searchable: frozenset[Tuple[int, int]]
-
-
 def _ensure_connectivity(grid: np.ndarray, home: Tuple[int, int], rng: random.Random) -> np.ndarray:
     h, w = grid.shape
     hx, hy = home

@@ -1,5 +1,5 @@
 import numpy as np
-from src.swarm_sar.astar import astar
+from swarm_sar.astar import astar
 
 
 def _grid(h, w, obs=None):

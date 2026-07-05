@@ -1,5 +1,5 @@
 import numpy as np
-from src.swarm_sar.environment import Environment, SimConfig
+from swarm_sar.environment import Environment, SimConfig
 
 
 def _load(sf="default"):
@@ -49,12 +49,14 @@ def test_connectivity_at_moderate_density():
 
 def _flood(grid, start):
     from collections import deque
-    q = deque([start]); seen = {start}
+    q = deque([start])
+    seen = {start}
     while q:
         x, y = q.popleft()
-        for dx, dy in ((1,0),(-1,0),(0,1),(0,-1)):
-            nx, ny = x+dx, y+dy
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nx, ny = x + dx, y + dy
             if 0 <= nx < grid.shape[1] and 0 <= ny < grid.shape[0]:
                 if grid[ny, nx] != 1 and (nx, ny) not in seen:
-                    seen.add((nx, ny)); q.append((nx, ny))
+                    seen.add((nx, ny))
+                    q.append((nx, ny))
     return seen

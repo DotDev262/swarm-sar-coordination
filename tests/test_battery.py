@@ -1,5 +1,6 @@
-from src.swarm_sar.drone import DroneAgent, DroneState
-from src.swarm_sar.environment import SimConfig, Snapshot
+from swarm_sar.drone import DroneAgent, DroneState
+from swarm_sar.environment import SimConfig
+from swarm_sar.mission_manager import Snapshot
 
 
 def _drone(state, battery, pos=(0, 0)):
@@ -26,8 +27,8 @@ def test_returning_drains():
     d = _drone(DroneState.RETURNING, 50.0)
     snap = _snap()
     rng = __import__("random").Random(0)
-    d.propose(snap, rng)
-    d.commit(d.propose(snap, rng), snap)
+    action = d.propose(snap, rng)
+    d.commit(action, snap)
     assert d.battery <= 49.0
 
 
@@ -35,8 +36,8 @@ def test_idle_recharges():
     d = _drone(DroneState.IDLE, 50.0)
     rng = __import__("random").Random(0)
     for _ in range(5):
-        d.propose(_snap(), rng)
-        d.commit(d.propose(_snap(), rng), _snap())
+        action = d.propose(_snap(), rng)
+        d.commit(action, _snap())
     assert d.battery > 50.0
 
 
@@ -45,14 +46,14 @@ def test_reporting_recharges():
     d.reporting_ticks_remaining = 3
     rng = __import__("random").Random(0)
     for _ in range(3):
-        d.propose(_snap(), rng)
-        d.commit(d.propose(_snap(), rng), _snap())
+        action = d.propose(_snap(), rng)
+        d.commit(action, _snap())
     assert d.battery > 50.0
 
 
 def test_crashes_below_zero_on_returning():
     d = _drone(DroneState.RETURNING, 0.5)
     rng = __import__("random").Random(0)
-    d.propose(_snap(), rng)
-    d.commit(d.propose(_snap(), rng), _snap())
+    action = d.propose(_snap(), rng)
+    d.commit(action, _snap())
     assert not d.alive

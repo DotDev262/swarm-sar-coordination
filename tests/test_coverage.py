@@ -1,5 +1,5 @@
 import numpy as np
-from src.swarm_sar.mission_manager import MissionManager, SimConfig, Environment
+from swarm_sar.mission_manager import MissionManager, SimConfig, Environment
 
 
 def _mm():

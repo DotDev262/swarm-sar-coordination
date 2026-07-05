@@ -1,7 +1,6 @@
 import json
 import os
 from dataclasses import dataclass
-from typing import Optional
 
 from swarm_sar.environment import SimConfig
 from swarm_sar.simulator import Simulator

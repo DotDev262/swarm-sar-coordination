@@ -1,6 +1,6 @@
 import numpy as np
-from src.swarm_sar.simulator import Simulator
-from src.swarm_sar.environment import SimConfig, Environment
+from swarm_sar.simulator import Simulator
+from swarm_sar.environment import SimConfig, Environment
 
 
 def _env():
