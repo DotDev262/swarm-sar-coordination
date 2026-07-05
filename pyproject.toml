@@ -1,0 +1,20 @@
+[project]
+name = "swarm_sar"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "pygame>=2.5",
+    "numpy>=1.26",
+    "matplotlib>=3.8",
+    "pandas>=2.2",
+]
+
+[project.scripts]
+swarm-sar = "swarm_sar:main"
+
+[dependency-groups]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

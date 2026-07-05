@@ -1,4 +1,8 @@
+[tools]
+uv = "latest"
 
 [tasks]
-
-dev = {run = "godot -e --path ./project"}
+dev   = "uv run python -m swarm_sar"
+test  = "uv run pytest"
+sweep = "uv run python -m swarm_sar --sweep"
+lint  = "uv run ruff check src tests"
