@@ -2,9 +2,14 @@
 .venv/
 __pycache__/
 .ruff_cache/
+.pytest_cache
 
 # Project output
 out/
+
+# Agent runtime metadata
+.superpowers/
+docs/superpowers
 
 # OS/junk
 .DS_Store
