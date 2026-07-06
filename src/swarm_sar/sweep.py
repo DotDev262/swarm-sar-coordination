@@ -61,7 +61,7 @@ def _cfg_from_sweep(sc: SweepConfig, n_drones: int, grid: int, seed: int) -> Sim
         log_interval_ticks=getattr(base, "log_every", 10),
         sensor_radius=getattr(base, "sensor_radius", 2),
         failure_rate=getattr(base, "failure_rate", 0.0),
-        kills=(),
+        battery_capacity=getattr(base, "battery", 0.0),
     )
 
 

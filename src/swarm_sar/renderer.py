@@ -85,7 +85,7 @@ class Renderer:
         bx = self.screen.get_width() - 140
         for d in self.sim.drones:
             bh = 10
-            fill = int(bh * d.battery / 100)
+            fill = int(bh * d.battery / max(self.sim.config.battery_capacity, 1))
             if d.state == DroneState.SEARCHING:
                 c = (0, 200, 0)
             elif d.state == DroneState.RETURNING:

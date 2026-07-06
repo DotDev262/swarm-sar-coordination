@@ -81,4 +81,4 @@ def test_reporting_transitions_to_idle():
     action = d.propose(snap, rng)
     d.commit(action, snap)
     assert d.state == DroneState.IDLE
-    assert d.battery == 100.0
+    assert d.battery == d.config.battery_capacity

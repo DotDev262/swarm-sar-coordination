@@ -29,8 +29,12 @@ class DroneAgent:
     config: SimConfig
     pos: tuple[int, int] = field(default_factory=lambda: (0, 0))
     state: DroneState = DroneState.IDLE
-    battery: float = 100.0
+    battery: float = 0.0
     alive: bool = True
+
+    def __post_init__(self):
+        if self.battery <= 0:
+            self.battery = self.config.battery_capacity
     target: Optional[tuple[int, int]] = None
     path: list[tuple[int, int]] = field(default_factory=list)
     _moved_this_tick: bool = field(default=False, repr=False)
@@ -96,9 +100,12 @@ class DroneAgent:
             if not (was_returning and self.pos == self.home):
                 self.battery -= 1.0
         elif action.state_transition == "IDLE":
-            self.battery = 100.0
+            self.battery = self.config.battery_capacity
         else:
-            self.battery = min(100.0, self.battery + self.config.recharge_rate)
+            self.battery = min(
+                self.config.battery_capacity,
+                self.battery + self.config.recharge_rate,
+            )
         if was_returning and self.pos == self.home and self.battery > 0:
             self.state = DroneState.REPORTING
         if self.battery < 0 and self.state == DroneState.RETURNING:

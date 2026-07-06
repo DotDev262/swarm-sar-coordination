@@ -66,6 +66,7 @@ uv run python -m swarm_sar --plot out/sweep/sweep_d10_g100_s0_r0.json
 | `--max-ticks` | 10000 | Stop after N ticks |
 | `--coverage` | 1.0 | Stop when coverage ≥ threshold (0–1) |
 | `--sensor-radius` | 2 | Sensor footprint radius (Chebyshev) |
+| `--battery` | 0 | Battery capacity per drone (0 = auto-scale to `4×(2×grid)`, enough to cross the grid and return) |
 | `--headless` / `--no-ui` | off | Run without Pygame |
 | `--sweep` | off | Headless parameter sweep |
 | `--plot PATH` | none | Plot a sweep run JSON to PNG |

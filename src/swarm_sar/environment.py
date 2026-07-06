@@ -23,6 +23,14 @@ class SimConfig:
     battery_safety_margin: float = 1.2
     recharge_rate: float = 2.0
     reporting_duration_ticks: int = 3
+    battery_capacity: float = 0.0
+
+    def __post_init__(self):
+        if self.battery_capacity <= 0:
+            # ponytail: auto-scale to ~4x the grid diagonal so a drone can
+            # cross the grid and return with margin. Tunable via field.
+            object.__setattr__(self, "battery_capacity",
+                                4.0 * (self.grid_size + self.grid_size))
 
 
 def _ensure_connectivity(grid: np.ndarray, home: Tuple[int, int], rng: random.Random) -> np.ndarray:

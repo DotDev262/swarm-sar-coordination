@@ -106,6 +106,8 @@ def main(argv=None):
     parser.add_argument("--log-every", type=int, default=10)
     parser.add_argument("--sensor-radius", type=int, default=2)
     parser.add_argument("--failure-rate", type=float, default=0.0)
+    parser.add_argument("--battery", type=float, default=0.0,
+                        help="battery capacity (0 = auto-scale to grid)")
     parser.add_argument("--sweep", action="store_true")
     parser.add_argument("--plot", type=str, default=None)
     parser.add_argument("--verbose", action="store_true")
@@ -131,6 +133,7 @@ def main(argv=None):
         log_interval_ticks=args.log_every,
         sensor_radius=args.sensor_radius,
         failure_rate=args.failure_rate,
+        battery_capacity=args.battery,
     )
     if args.plot:
         from swarm_sar.plot import main as plot_main
