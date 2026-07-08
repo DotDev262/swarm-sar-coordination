@@ -28,6 +28,8 @@ def test_none_when_exhausted():
 
 def test_assigned_cell_not_reassigned():
     mm = _mm()
+    mm.per_drone_stats[1] = {"assignments": 0, "cells_marked": 0, "distance": 0,
+                              "time_in_state": {"IDLE": 0, "SEARCHING": 0, "RETURNING": 0, "REPORTING": 0}}
     r1 = mm.assign_task(0, (0, 0))
     assert r1 is not None
     r2 = mm.assign_task(1, (0, 0))

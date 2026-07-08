@@ -8,6 +8,7 @@ import random
 
 @dataclass(frozen=True)
 class SimConfig:
+    """Configuration settings for the Swarm SAR Coordination simulation."""
     scenario_path: Optional[str] = None
     n_drones: int = 5
     grid_size: int = 20
@@ -18,22 +19,32 @@ class SimConfig:
     max_ticks: int = 10000
     coverage_threshold: float = 1.0
     log_interval_ticks: int = 10
-    failure_rate: float = 0.0
-    kills: Tuple[Tuple[int, int], ...] = ()
+
     battery_safety_margin: float = 1.2
     recharge_rate: float = 2.0
     reporting_duration_ticks: int = 3
     battery_capacity: float = 0.0
 
     def __post_init__(self):
+        """Scales battery capacity relative to grid size when no explicit value is set."""
         if self.battery_capacity <= 0:
-            # ponytail: auto-scale to ~4x the grid diagonal so a drone can
-            # cross the grid and return with margin. Tunable via field.
+            # Scale capacity so that drones must return to base and recharge in default runs
             object.__setattr__(self, "battery_capacity",
-                                4.0 * (self.grid_size + self.grid_size))
+                                1.5 * (self.grid_size + self.grid_size))
 
 
-def _ensure_connectivity(grid: np.ndarray, home: Tuple[int, int], rng: random.Random) -> np.ndarray:
+def _ensure_connectivity(grid: np.ndarray, home: Tuple[int, int]) -> np.ndarray:
+    """Ensures that all traversable grid cells are connected to the home base.
+
+    Floods the grid from home and marks any unreachable empty cells as obstacles.
+
+    Args:
+        grid: A 2D numpy array representing the environment grid.
+        home: The (x, y) coordinates of the home base.
+
+    Returns:
+        The modified numpy grid.
+    """
     h, w = grid.shape
     hx, hy = home
 
@@ -58,14 +69,26 @@ def _ensure_connectivity(grid: np.ndarray, home: Tuple[int, int], rng: random.Ra
 
 @dataclass
 class Environment:
+    """Representation of the search and rescue grid environment."""
     width: int
     height: int
     grid: np.ndarray
     home: Tuple[int, int]
     spawn: Tuple[int, int]
+    target: Optional[Tuple[int, int]] = None
 
     @classmethod
     def generate_grid(cls, size: int, density: float, seed: int) -> np.ndarray:
+        """Generates a randomized grid with obstacles and a home base.
+
+        Args:
+            size: Width and height of the square grid.
+            density: Ratio of cells that should contain obstacles.
+            seed: Random seed for repeatability.
+
+        Returns:
+            A 2D numpy array representing the generated grid.
+        """
         rng = random.Random(seed)
         grid = np.zeros((size, size), dtype=np.uint8)
         hx = hy = size // 2
@@ -83,20 +106,45 @@ class Environment:
                     grid[ny, nx] = 0
 
         # ensure connectivity
-        _ensure_connectivity(grid, (hx, hy), rng)
+        _ensure_connectivity(grid, (hx, hy))
 
         grid[hy, hx] = 2
         return grid
 
     @classmethod
     def from_config(cls, config: SimConfig) -> "Environment":
+        """Constructs an Environment instance from a SimConfig settings object.
+
+        Args:
+            config: A SimConfig instance.
+
+        Returns:
+            An Environment instance with spawned target cell details.
+        """
         if config.scenario_path:
-            return cls._load_scenario(Path(config.scenario_path))
-        grid = cls.generate_grid(config.grid_size, config.obstacle_density, config.seed)
-        return cls._from_grid(grid)
+            env = cls._load_scenario(Path(config.scenario_path))
+        else:
+            grid = cls.generate_grid(config.grid_size, config.obstacle_density, config.seed)
+            env = cls._from_grid(grid)
+        
+        rng = random.Random(config.seed)
+        searchable_cells = [
+            (int(x), int(y)) for y, x in zip(*np.where(env.grid == 0))
+        ]
+        if searchable_cells:
+            env.target = rng.choice(searchable_cells)
+        return env
 
     @classmethod
     def _from_grid(cls, grid: np.ndarray) -> "Environment":
+        """Helper method to construct Environment from pre-existing grid array.
+
+        Args:
+            grid: A 2D numpy grid array.
+
+        Returns:
+            An Environment instance.
+        """
         h, w = grid.shape
         assert np.sum(grid == 2) == 1, "generate_grid must mark exactly one home"
         hy, hx = np.where(grid == 2)
@@ -105,6 +153,17 @@ class Environment:
 
     @classmethod
     def _load_scenario(cls, path: Path) -> "Environment":
+        """Loads a grid environment scenario from a text file.
+
+        Args:
+            path: Path to the scenario file.
+
+        Returns:
+            An Environment instance loaded from file.
+
+        Raises:
+            ValueError: If scenario has format issues like missing home base.
+        """
         rows = []
         with open(path) as fh:
             for line in fh:
@@ -126,13 +185,9 @@ class Environment:
                     grid[y, x] = 1
                 elif ch == "H":
                     grid[y, x] = 2
-                if home is not None:
-                    if ch == "H":
+                    if home is not None:
                         raise ValueError(f"Multiple H in {path}")
-                if ch == "H":
                     home = (x, y)
-                elif ch == "S":
-                    pass # handled below
 
         if home is None:
             raise ValueError(f"No 'H' in {path}")

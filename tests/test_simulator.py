@@ -1,6 +1,8 @@
 import numpy as np
 from swarm_sar.simulator import Simulator
 from swarm_sar.environment import SimConfig, Environment
+from swarm_sar.drone import DroneState
+
 
 
 def _env():
@@ -57,3 +59,25 @@ def test_is_complete():
     for cell in list(sim.mm.searchable):
         sim.mm.mark_searched({cell}, 0)
     assert sim.mm.is_complete()
+
+
+def test_drone_crash_releases_task():
+    cfg = SimConfig(seed=0, n_drones=1, grid_size=5, obstacle_density=0.0, battery_capacity=10.0)
+    sim = Simulator(_env(), cfg)
+    
+    # Run once to get a task assigned and move the drone
+    sim.tick_once()
+    drone = sim.drones[0]
+    assert drone.state == DroneState.SEARCHING or drone.target is not None
+    target = drone.target
+    assert target in sim.mm.in_flight.values()
+    
+    # Artificially drain battery to negative to trigger crash on next tick
+    drone.battery = -1.0
+    sim.tick_once()
+    
+    # Drone should be dead, and the task should be released from in_flight
+    assert not drone.alive
+    assert drone.id not in sim.mm.in_flight
+    assert len(sim.mm.failure_log) == 1
+

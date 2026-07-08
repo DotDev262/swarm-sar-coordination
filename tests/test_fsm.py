@@ -15,7 +15,6 @@ def _drone(pos=(0, 0), state=DroneState.IDLE, battery=100.0):
 def _snap():
     return Snapshot(
         grid=tuple(tuple([0] * 5) for _ in range(5)),
-        obstacles=frozenset(),
         searched=frozenset(),
         drone_positions={},
         home=(2, 2),
@@ -74,7 +73,7 @@ def test_at_home_returning_transitions_to_reporting():
 
 
 def test_reporting_transitions_to_idle():
-    d = _drone(state=DroneState.REPORTING, battery=50.0)
+    d = _drone(pos=(2, 2), state=DroneState.REPORTING, battery=50.0)
     d.reporting_ticks_remaining = 1
     snap = _snap()
     rng = __import__("random").Random(0)

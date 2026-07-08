@@ -8,6 +8,8 @@ from swarm_sar.simulator import Simulator
 
 @dataclass
 class SweepConfig:
+    """Configuration for a parameter sweep across drones, grids, seeds, and repeats."""
+
     drones: list
     grids: list
     seeds: int
@@ -20,11 +22,18 @@ class SweepConfig:
 
 
 def _run_one(cfg: SimConfig) -> dict:
-    env_cfg = cfg
+    """Runs a single simulation to completion and returns result metrics.
+
+    Args:
+        cfg: SimConfig for this individual run.
+
+    Returns:
+        Dict with seed, drone/grid config, final tick, coverage, and stats.
+    """
     from swarm_sar.environment import Environment
-    env = Environment.from_config(env_cfg)
-    sim = Simulator(env, env_cfg)
-    while not sim.is_complete() and sim.tick < env_cfg.max_ticks:
+    env = Environment.from_config(cfg)
+    sim = Simulator(env, cfg)
+    while not sim.is_complete() and sim.tick < cfg.max_ticks:
         sim.tick_once()
     active = sum(1 for d in sim.drones if d.alive)
     avg_bat = (
@@ -33,10 +42,10 @@ def _run_one(cfg: SimConfig) -> dict:
         else 0.0
     )
     return {
-        "seed": env_cfg.seed,
-        "n_drones": env_cfg.n_drones,
-        "grid_size": env_cfg.grid_size,
-        "obstacle_density": env_cfg.obstacle_density,
+        "seed": cfg.seed,
+        "n_drones": cfg.n_drones,
+        "grid_size": cfg.grid_size,
+        "obstacle_density": cfg.obstacle_density,
         "final_tick": sim.tick,
         "coverage_pct": round(sim.mm.coverage() * 100, 2),
         "searched_cells": len(sim.mm.searched),
@@ -48,6 +57,17 @@ def _run_one(cfg: SimConfig) -> dict:
 
 
 def _cfg_from_sweep(sc: SweepConfig, n_drones: int, grid: int, seed: int) -> SimConfig:
+    """Builds a SimConfig for a single sweep cell from the sweep configuration.
+
+    Args:
+        sc: The SweepConfig for the overall batch.
+        n_drones: Number of drones for this run.
+        grid: Grid size for this run.
+        seed: Random seed for this run.
+
+    Returns:
+        A SimConfig instance ready for simulation.
+    """
     base = sc.base_config
     return SimConfig(
         scenario_path=getattr(base, "scenario", None),
@@ -60,12 +80,19 @@ def _cfg_from_sweep(sc: SweepConfig, n_drones: int, grid: int, seed: int) -> Sim
         coverage_threshold=getattr(base, "coverage", 1.0),
         log_interval_ticks=getattr(base, "log_every", 10),
         sensor_radius=getattr(base, "sensor_radius", 2),
-        failure_rate=getattr(base, "failure_rate", 0.0),
         battery_capacity=getattr(base, "battery", 0.0),
     )
 
 
 def run_sweep(sc: SweepConfig) -> list:
+    """Executes the full parameter sweep, writing per-run and summary JSON files.
+
+    Args:
+        sc: SweepConfig defining the parameter grid.
+
+    Returns:
+        List of result dicts from every run in the sweep.
+    """
     os.makedirs(sc.out_dir, exist_ok=True)
     results = []
     for n in sc.drones:

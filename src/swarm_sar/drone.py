@@ -24,6 +24,12 @@ class DroneState(Enum):
 
 @dataclass
 class DroneAgent:
+    """Represents a drone agent in the Search and Rescue Swarm.
+
+    Maintains position, state machine transitions, battery usage, and path planning
+    activities.
+    """
+
     id: int
     home: tuple[int, int]
     config: SimConfig
@@ -33,6 +39,7 @@ class DroneAgent:
     alive: bool = True
 
     def __post_init__(self):
+        """Initializes battery to capacity if not explicitly set above zero."""
         if self.battery <= 0:
             self.battery = self.config.battery_capacity
     target: Optional[tuple[int, int]] = None
@@ -42,11 +49,16 @@ class DroneAgent:
     crashed: bool = field(default=False, repr=False)
     _reported: bool = field(default=False, repr=False)
 
-    def propose(self, snap: Snapshot, rng):
-        # ponytail: propose mutates self.path (via _next_*_move re-path) and
-        # decrements reporting_ticks_remaining. Safe because Simulator calls
-        # propose exactly once per drone per tick. Pure-propose refactor
-        # deferred: would require threading the new path through Action.
+    def propose(self, snap: Snapshot, rng) -> Action:
+        """Proposes an action to execute in the next tick based on current state.
+
+        Args:
+            snap: A Snapshot instance representing the current environment.
+            rng: A random generator instance.
+
+        Returns:
+            An Action instance containing target movement and state transition details.
+        """
         if not self.alive:
             return Action(None, frozenset(), False, None)
         if self.state == DroneState.IDLE:
@@ -75,7 +87,13 @@ class DroneAgent:
             return Action(None, frozenset(), False, None)
         return Action(None, frozenset(), False, None)
 
-    def commit(self, action, snap: Snapshot) -> None:
+    def commit(self, action: Action, snap: Snapshot) -> None:
+        """Commits the proposed action and updates internal battery/crashed states.
+
+        Args:
+            action: The Action proposed during the decision phase.
+            snap: The Snapshot representing the environment state.
+        """
         if not self.alive:
             return
         was_returning = self.state == DroneState.RETURNING
@@ -100,19 +118,29 @@ class DroneAgent:
             if not (was_returning and self.pos == self.home):
                 self.battery -= 1.0
         elif action.state_transition == "IDLE":
-            self.battery = self.config.battery_capacity
+            if self.pos == self.home:
+                self.battery = self.config.battery_capacity
         else:
-            self.battery = min(
-                self.config.battery_capacity,
-                self.battery + self.config.recharge_rate,
-            )
+            if self.pos == self.home:
+                self.battery = min(
+                    self.config.battery_capacity,
+                    self.battery + self.config.recharge_rate,
+                )
         if was_returning and self.pos == self.home and self.battery > 0:
             self.state = DroneState.REPORTING
-        if self.battery < 0 and self.state == DroneState.RETURNING:
+        if self.battery < 0:
             self.crashed = True
             self.alive = False
 
-    def _sensor_footprint(self, center):
+    def _sensor_footprint(self, center: tuple[int, int]) -> frozenset[tuple[int, int]]:
+        """Calculates coordinates covered by the sensor footprint at a cell.
+
+        Args:
+            center: The center (x, y) coordinate.
+
+        Returns:
+            A frozenset of grid coordinates covered by the sensor.
+        """
         r = self.config.sensor_radius
         cx, cy = center
         w = h = self.config.grid_size
@@ -124,14 +152,23 @@ class DroneAgent:
                     cells.add((nx, ny))
         return frozenset(cells)
 
-    def _next_search_move(self, snap):
+    def _next_search_move(self, snap: Snapshot) -> Optional[tuple[int, int]]:
+        """Plans and returns the next grid move when in SEARCHING state.
+
+        Args:
+            snap: The current Snapshot data.
+
+        Returns:
+            The next step (x, y) coordinates, or None if blocked.
+        """
         if not self.target:
             return None
-        if not self.path or self.path[-1] != self.target:
+        # If the path is empty, outdated, or the next step is blocked, recalculate
+        if not self.path or self.path[-1] != self.target or _is_blocked_snap(snap, self.path[0]):
             self.path = list(
                 astar(
                     np.asarray(snap.grid),
-                    set(snap.drone_positions.values()) - {self.pos},
+                    set(snap.drone_positions.values()) - {self.pos, self.target},
                     self.pos,
                     self.target,
                 )
@@ -145,17 +182,22 @@ class DroneAgent:
             return None
         nxt = self.path[0]
         if nxt == self.pos or _is_blocked_snap(snap, nxt):
-            detour = self._find_detour(snap)
-            if detour is not None:
-                self.path = [detour] + self.path
-                return detour
             return None
         return nxt
 
-    def _next_return_move(self, snap):
+    def _next_return_move(self, snap: Snapshot) -> Optional[tuple[int, int]]:
+        """Plans and returns the next grid move when in RETURNING state.
+
+        Args:
+            snap: The current Snapshot data.
+
+        Returns:
+            The next step (x, y) coordinates, or None if blocked.
+        """
         goal = self.home
-        if not self.path or self.path[-1] != goal:
-            blockers = set(snap.drone_positions.values()) - {self.pos}
+        # If the path is empty, outdated, or the next step is blocked, recalculate
+        if not self.path or self.path[-1] != goal or (self.path and _is_blocked_snap(snap, self.path[0])):
+            blockers = set(snap.drone_positions.values()) - {self.pos, goal}
             grid = np.array(snap.grid) if not hasattr(snap.grid, "shape") else snap.grid
             result = astar(grid, blockers, self.pos, goal)
             self.path = result if result else []
@@ -169,22 +211,13 @@ class DroneAgent:
             return None
         return nxt
 
-    def _find_detour(self, snap):
-        cx, cy = self.pos
-        gx = self.target[0] if self.target else self.home[0]
-        gy = self.target[1] if self.target else self.home[1]
-        best = None
-        best_d2 = None
-        for dx, dy in _NEIGHBORS_8:
-            nx, ny = cx + dx, cy + dy
-            if _is_blocked_snap(snap, (nx, ny)):
-                continue
-            d2 = (nx - gx) ** 2 + (ny - gy) ** 2
-            if best is None or d2 < best_d2:
-                best, best_d2 = (nx, ny), d2
-        return best if best and best != self.pos else None
-
     def check_return_threshold(self) -> bool:
+        """Determines if the battery is low enough to require returning to base.
+
+        Returns:
+            True if remaining battery capacity falls below the estimated return
+            travel distance with safety margins. False otherwise.
+        """
         if self.state != DroneState.SEARCHING or not self.target:
             return False
         dx = abs(self.pos[0] - self.home[0])
@@ -193,15 +226,16 @@ class DroneAgent:
         return self.battery <= est
 
 
-_NEIGHBORS_8 = [
-    (dx, dy)
-    for dy in (-1, 0, 1)
-    for dx in (-1, 0, 1)
-    if not (dx == 0 and dy == 0)
-]
+def _is_blocked_snap(snap: Snapshot, pos: tuple[int, int]) -> bool:
+    """Checks if a cell is blocked by grid borders, obstacles, or other drones.
 
+    Args:
+        snap: The current Snapshot data.
+        pos: The (x, y) coordinate target check.
 
-def _is_blocked_snap(snap, pos):
+    Returns:
+        True if the position is blocked. False otherwise.
+    """
     x, y = pos
     h, w = len(snap.grid), len(snap.grid[0])
     if not (0 <= x < w and 0 <= y < h):

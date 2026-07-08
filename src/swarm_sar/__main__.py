@@ -1,8 +1,40 @@
 import argparse
 import time
+import os
+
+
+def get_unique_log_path(base_dir, prefix, config):
+    """Generates a unique CSV log file path that does not overwrite existing files.
+
+    Args:
+        base_dir: Output directory for log files.
+        prefix: File name prefix (e.g. 'run' or 'headless').
+        config: SimConfig instance used to derive the file name.
+
+    Returns:
+        A file path string that does not currently exist.
+    """
+    os.makedirs(base_dir, exist_ok=True)
+    filename = f"{prefix}_d{config.n_drones}_s{config.seed}.csv"
+    path = os.path.join(base_dir, filename)
+    if not os.path.exists(path):
+        return path
+    base, ext = os.path.splitext(filename)
+    counter = 1
+    while True:
+        new_filename = f"{base}_{counter}{ext}"
+        new_path = os.path.join(base_dir, new_filename)
+        if not os.path.exists(new_path):
+            return new_path
+        counter += 1
 
 
 def run_interactive(config):
+    """Runs the simulation with a Pygame GUI for live observation and control.
+
+    Args:
+        config: SimConfig instance controlling simulation parameters.
+    """
     import pygame
     from swarm_sar.simulator import Simulator
     from swarm_sar.environment import Environment
@@ -10,7 +42,8 @@ def run_interactive(config):
     env = Environment.from_config(config)
     sim = Simulator(env, config)
     mm = sim.mm
-    mm.set_log_path(f"out/run_d{config.n_drones}_s{config.seed}.csv")
+    log_path = get_unique_log_path("out", "run", config)
+    mm.set_log_path(log_path)
     renderer = Renderer(sim)
     running = True
     paused = False
@@ -54,6 +87,11 @@ def run_interactive(config):
 
 
 def run_sweep(args):
+    """Runs a batch sweep over drone counts, grid sizes, seeds, and repeats.
+
+    Args:
+        args: Parsed argparse namespace containing sweep parameters.
+    """
     from swarm_sar.sweep import run_sweep, SweepConfig
     sweep_cfg = SweepConfig(
         drones=[int(x) for x in args.sweep_drones.split(",")],
@@ -70,13 +108,19 @@ def run_sweep(args):
 
 
 def run_headless(config):
+    """Runs the simulation without a GUI and prints final results.
+
+    Args:
+        config: SimConfig instance controlling simulation parameters.
+    """
     from swarm_sar.simulator import Simulator
     from swarm_sar.environment import Environment
 
     env = Environment.from_config(config)
     sim = Simulator(env, config)
     mm = sim.mm
-    mm.set_log_path(f"out/headless_d{config.n_drones}_s{config.seed}.csv")
+    log_path = get_unique_log_path("out", "headless", config)
+    mm.set_log_path(log_path)
 
     while not sim.is_complete() and sim.tick < config.max_ticks:
         sim.tick_once()
@@ -93,6 +137,11 @@ def run_headless(config):
 
 
 def main(argv=None):
+    """Parses CLI arguments and dispatches to the appropriate run mode.
+
+    Args:
+        argv: Optional list of argument strings (defaults to sys.argv).
+    """
     from swarm_sar.environment import SimConfig
     parser = argparse.ArgumentParser(prog="swarm_sar")
     parser.add_argument("--scenario", default=None)
@@ -105,7 +154,6 @@ def main(argv=None):
     parser.add_argument("--coverage", type=float, default=1.0)
     parser.add_argument("--log-every", type=int, default=10)
     parser.add_argument("--sensor-radius", type=int, default=2)
-    parser.add_argument("--failure-rate", type=float, default=0.0)
     parser.add_argument("--battery", type=float, default=0.0,
                         help="battery capacity (0 = auto-scale to grid)")
     parser.add_argument("--sweep", action="store_true")
@@ -132,7 +180,6 @@ def main(argv=None):
         coverage_threshold=args.coverage,
         log_interval_ticks=args.log_every,
         sensor_radius=args.sensor_radius,
-        failure_rate=args.failure_rate,
         battery_capacity=args.battery,
     )
     if args.plot:

@@ -6,7 +6,6 @@ dependencies = [
     "pygame>=2.5",
     "numpy>=1.26",
     "matplotlib>=3.8",
-    "pandas>=2.2",
 ]
 
 [project.scripts]

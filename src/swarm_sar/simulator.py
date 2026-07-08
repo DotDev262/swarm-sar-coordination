@@ -6,7 +6,19 @@ from swarm_sar.astar import astar
 
 
 class Simulator:
+    """Orchestrates the swarm search and rescue simulation.
+
+    Manages spawn positioning, step-by-step sequential time ticks, agent path planning,
+    movement commitments, and checks for mission completion.
+    """
+
     def __init__(self, env: Environment, config: SimConfig):
+        """Initializes the Simulator and spawns drones near the home position.
+
+        Args:
+            env: The Environment instance containing the grid and spawn layout.
+            config: The SimConfig settings for the simulation.
+        """
         self.env = env
         self.config = config
         self.mm = MissionManager(env, config)
@@ -34,10 +46,29 @@ class Simulator:
                     break
 
     def tick_once(self):
+        """Advances the simulation by a single tick.
+
+        Performs task assignment, sequential prioritized path planning, action
+        generation, searched footprint marking, state commitments, battery updates,
+        and death checks.
+        """
+        import dataclasses
         snap = self.mm.snapshot(self.drones)
         alive = [d for d in self.drones if d.alive]
 
-        proposals = [d.propose(snap, self.rng) for d in alive]
+        # Prioritized sequential path planning (drones with lower index have higher priority)
+        proposals = []
+        future_positions = {d.id: d.pos for d in self.drones}
+        
+        for d in alive:
+            # Plan using the expected next positions of already processed drones
+            current_snap = dataclasses.replace(snap, drone_positions=future_positions.copy())
+            action = d.propose(current_snap, self.rng)
+            proposals.append(action)
+            
+            # If the drone plans to move, update its expected next position
+            if action.move_to:
+                future_positions[d.id] = action.move_to
 
         for d, action in zip(alive, proposals):
             if action.mark_cells:
@@ -50,25 +81,34 @@ class Simulator:
                     d.target = result
                     d.state = DroneState.SEARCHING
                     others = {
-                        alive[j].pos
+                        future_positions[alive[j].id]
                         for j in range(len(alive))
                         if j != idx
-                    }
+                    } - {result}
                     d.path = astar(
                         self.env.grid,
                         others,
                         d.pos,
                         result,
                     )
+                elif d.pos != self.env.home:
+                    d.state = DroneState.RETURNING
+                    d.target = None
+                    d.path = []
 
         for d in self.drones:
             d._moved_this_tick = False
 
         for d, action in zip(alive, proposals):
+            was_alive = d.alive
+            prev_target = d.target
+            if action.state_transition == "RETURNING":
+                self.mm.in_flight.pop(d.id, None)
             d.commit(action, snap)
-            self.mm.record_move(d.id)
-            if d.state == DroneState.SEARCHING and d.target is not None and d.pos == d.target:
-                d.state = DroneState.RETURNING
+            if was_alive and not d.alive:
+                self.mm.on_drone_killed(d.id, prev_target, self.tick)
+            elif d.state == DroneState.SEARCHING and d.target is not None and d.pos == d.target:
+                d.state = DroneState.IDLE
                 d.target = None
                 d.path = []
                 self.mm.in_flight.pop(d.id, None)
@@ -76,4 +116,9 @@ class Simulator:
         self.tick += 1
 
     def is_complete(self):
+        """Checks if the overall simulation run is complete.
+
+        Returns:
+            True if the target is found or target coverage threshold is met.
+        """
         return self.mm.is_complete()

@@ -15,7 +15,6 @@ def _drone(state, battery, pos=(0, 0)):
 def _snap():
     return Snapshot(
         grid=tuple(tuple([0] * 5) for _ in range(5)),
-        obstacles=frozenset(),
         searched=frozenset(),
         drone_positions={},
         home=(2, 2),
@@ -33,22 +32,22 @@ def test_returning_drains():
 
 
 def test_idle_recharges():
-    d = _drone(DroneState.IDLE, 20.0)
+    d = _drone(DroneState.IDLE, 10.0, pos=(2, 2))
     rng = __import__("random").Random(0)
     for _ in range(5):
         action = d.propose(_snap(), rng)
         d.commit(action, _snap())
-    assert d.battery > 20.0
+    assert d.battery > 10.0
 
 
 def test_reporting_recharges():
-    d = _drone(DroneState.REPORTING, 20.0)
+    d = _drone(DroneState.REPORTING, 10.0, pos=(2, 2))
     d.reporting_ticks_remaining = 3
     rng = __import__("random").Random(0)
     for _ in range(3):
         action = d.propose(_snap(), rng)
         d.commit(action, _snap())
-    assert d.battery > 20.0
+    assert d.battery > 10.0
 
 
 def test_crashes_below_zero_on_returning():

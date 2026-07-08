@@ -3,8 +3,15 @@ from typing import Optional
 
 
 def plot_coverage(filepath: str, output_file: Optional[str] = None):
+    """Generates a coverage bar chart from a sweep JSON result file.
+
+    Args:
+        filepath: Path to the sweep JSON file (single run or list of runs).
+        output_file: Optional output PNG path. If None, displays interactively.
+    """
     import matplotlib
-    matplotlib.use("Agg") if output_file else None
+    if output_file:
+        matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     with open(filepath, "r") as f:
@@ -29,4 +36,9 @@ def plot_coverage(filepath: str, output_file: Optional[str] = None):
 
 
 def main(filepath: str):
+    """Entry point for the plot sub-command, converting JSON to PNG.
+
+    Args:
+        filepath: Path to sweep JSON. Output PNG is written to the same path with a .png extension.
+    """
     plot_coverage(filepath, filepath.replace(".json", ".png"))
