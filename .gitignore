@@ -4,8 +4,6 @@
 export_presets.cfg
 export_tokens.cfg
 
-docs/
-
 # System and editor temporary files
 .DS_Store
 .DS_Store?
