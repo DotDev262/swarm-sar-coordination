@@ -1,10 +1,16 @@
-# Godot 4 specific files
-.godot/
-.import/
-export_presets.cfg
-export_tokens.cfg
+# Python/uv
+.venv/
+__pycache__/
+.ruff_cache/
+.pytest_cache
 
-# System and editor temporary files
+# Project output
+out/
+
+# Agent runtime metadata
+.superpowers/
+
+# OS/junk
 .DS_Store
 .DS_Store?
 ._*
@@ -12,16 +18,5 @@ export_tokens.cfg
 .Trashes
 ehthumbs.db
 Thumbs.db
-
-# Logs and debug files
 *.log
 *.tmp
-
-# Ignore local tool configurations
-# Keep your mise.toml and flake.nix, but ignore the tool installations
-.mise/
-.venv/
-__pycache__/
-
-# If you decide to add Python/uv later, keep this:
-.python-version

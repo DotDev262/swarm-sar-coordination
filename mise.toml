@@ -1,2 +1,8 @@
 [tools]
-"aqua:godotengine/godot"= {version="4.7-stable"}
+uv = "latest"
+
+[tasks]
+dev   = "uv run python -m swarm_sar"
+test  = "uv run pytest"
+sweep = "uv run python -m swarm_sar --sweep"
+lint  = "uv run ruff check src tests"
